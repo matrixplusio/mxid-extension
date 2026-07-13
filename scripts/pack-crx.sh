@@ -12,7 +12,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 CHROME="${CHROME:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
-KEY="${KEY:-$(cd .. && pwd)/mxid-login-key.pem}"
+KEY="${KEY:-$PWD/key.pem}"
 [[ -x "$CHROME" ]] || { echo "Chrome not at: $CHROME (set CHROME=…)"; exit 1; }
 [[ -f "$KEY" ]] || { echo "signing key not found: $KEY (run scripts/gen-key.sh)"; exit 1; }
 

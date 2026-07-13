@@ -2,9 +2,16 @@
 
 ## A. Developer install (dev / testing)
 
-1. Open `chrome://extensions` (or `edge://extensions`).
-2. Toggle **Developer mode** (top-right).
-3. **Load unpacked** → pick this folder (`mxid-extension`).
+1. `bash scripts/pack.sh` — produces `build/unpacked/` (runtime files only, no
+   signing key or repo clutter). Load THIS, not the repo root (the repo root has
+   key.pem, which Chrome warns about).
+2. Open `chrome://extensions` (or `edge://extensions`).
+3. Toggle **Developer mode** (top-right).
+4. **Load unpacked** → pick **`build/unpacked`**.
+
+> The `.crx` in `build/enterprise/` CANNOT be loaded this way (it's a packed file)
+> and cannot be drag-installed on standard Chrome — it's for enterprise policy
+> (§C2). "Load unpacked" always needs a *folder* containing `manifest.json`.
 4. Note the assigned **extension id** (shown on the card).
 5. Extension **Details → Extension options** → set your **MXID base URL**.
 6. Sign in to the MXID portal in the same browser.

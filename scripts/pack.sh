@@ -11,8 +11,19 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 VER=$(python3 -c "import json;print(json.load(open('manifest.json'))['version'])")
 mkdir -p build
+
+# Runtime files only — no signing key, no scripts/docs. These are what ships.
+RUNTIME=(manifest.json src icons managed_schema.json)
+
+# 1. A clean UNPACKED folder for "Load unpacked" (dev / manual test). Keeps the
+#    manifest "key" so the id is the stable one; excludes key.pem + repo clutter.
+UNP="build/unpacked"
+rm -rf "$UNP"; mkdir -p "$UNP"
+cp -r "${RUNTIME[@]}" "$UNP"/
+echo "unpacked  -> $UNP        (chrome://extensions → Load unpacked → this)"
+
+# 2. A ZIP for the Chrome Web Store.
 ZIP="build/mxid-login-$VER.zip"
 rm -f "$ZIP"
-# ../mxid-login-key.pem lives outside the packed dir; it must NOT ship inside the package.
-zip -r -q "$ZIP" manifest.json src -x '*.DS_Store'
-echo "built $ZIP"
+( cd "$UNP" && zip -r -q "../mxid-login-$VER.zip" . -x '*.DS_Store' )
+echo "store zip -> $ZIP"
