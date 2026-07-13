@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!--
+  Enterprise auto-update manifest (Model 2, self-hosted forced-install).
+  Host this file + the signed .crx on an internal HTTPS server, and point the
+  MDM/GPO ExtensionInstallForcelist entry at this URL:
+     bfdbncnhgjdbaeipacekokclgbkhlpic;https://YOUR-HOST/update.xml
+  Bump version here (and in manifest.json) on every CRX you publish so Chrome
+  fetches the update.
+-->
+<gupdate xmlns='http://www.google.com/update2/response' protocol='2.0'>
+  <app appid='bfdbncnhgjdbaeipacekokclgbkhlpic'>
+    <updatecheck codebase='https://YOUR-INTERNAL-HOST/mxid-form-fill.crx' version='0.1.0' />
+  </app>
+</gupdate>

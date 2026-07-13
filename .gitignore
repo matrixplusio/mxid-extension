@@ -1,4 +1,7 @@
 node_modules/
 *.zip
+*.crx
 .DS_Store
 dist/
+build/
+key.pem
