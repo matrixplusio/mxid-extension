@@ -60,6 +60,29 @@ Same Chromium build/CRX. Use Edge Add-ons, or the same forced-install policy
 Separate build (see ROADMAP E5). Distribute signed via addons.mozilla.org, or
 self-distribute through the enterprise policy (`ExtensionSettings` → `installation_mode: force_installed`).
 
+## C3. Set the MXID URL for the fleet (managed config)
+
+The extension is domain-agnostic (host_permissions is broad `https://*/*`); it just
+needs to know YOUR MXID URL. Precedence: **managed policy → Options page → default**.
+For a managed fleet, push the URL with the same MDM/GPO that force-installs it — no
+per-user setup, no re-packaging:
+
+- **Windows (GPO/registry):**
+  `HKLM\Software\Policies\Google\Chrome\3rdparty\extensions\bfdbncnhgjdbaeipacekokclgbkhlpic\policy`
+  value `mxidBaseUrl` = `https://mxid.corp`
+- **macOS / Linux (managed policy JSON):**
+  ```json
+  {
+    "3rdparty": {
+      "extensions": {
+        "bfdbncnhgjdbaeipacekokclgbkhlpic": { "mxidBaseUrl": "https://mxid.corp" }
+      }
+    }
+  }
+  ```
+The extension reads this via `chrome.storage.managed` (schema: `managed_schema.json`).
+Unmanaged browsers fall back to the Options page.
+
 ## D. Server checklist recap
 
 - [ ] MXID served over **HTTPS**.

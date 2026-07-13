@@ -21,7 +21,18 @@ export const API = {
 // Header carrying the per-install binding token on reveal.
 export const TOKEN_HEADER = 'X-MXID-FormFill-Token'
 
+// getBaseUrl resolves the MXID URL, precedence:
+//   1. enterprise managed policy (chrome.storage.managed) — IT pushes it with the
+//      force-install, so a managed fleet needs zero per-user setup;
+//   2. the user's Options setting;
+//   3. the built-in default.
 export async function getBaseUrl() {
+  try {
+    const m = await chrome.storage.managed.get('mxidBaseUrl')
+    if (m && m.mxidBaseUrl) return String(m.mxidBaseUrl).replace(/\/+$/, '')
+  } catch {
+    // no managed policy (unmanaged browser) — fall through
+  }
   const { mxidBaseUrl } = await chrome.storage.sync.get('mxidBaseUrl')
   return (mxidBaseUrl || DEFAULT_BASE).replace(/\/+$/, '')
 }

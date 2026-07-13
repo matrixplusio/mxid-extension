@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "title": "MXID Login managed configuration",
+  "description": "Pushed by enterprise policy (same MDM/GPO that force-installs the extension). Lets IT set the MXID URL once for the whole fleet — no per-user setup.",
+  "properties": {
+    "mxidBaseUrl": {
+      "type": "string",
+      "title": "MXID base URL",
+      "description": "The MXID portal origin, e.g. https://mxid.corp. The extension calls its /api/v1/portal/... endpoints here."
+    }
+  }
+}
