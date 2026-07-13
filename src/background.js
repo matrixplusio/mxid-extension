@@ -65,6 +65,15 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         sendResponse({ ok: true })
         break
       }
+      case 'startCapture':
+        // Arm capture; the content script on the active tab picks it up on reload.
+        await chrome.storage.local.set({ capturing: true, lastCapture: null })
+        sendResponse({ ok: true })
+        break
+      case 'captureResult':
+        await chrome.storage.local.set({ capturing: false, lastCapture: msg.descriptor })
+        sendResponse({ ok: true })
+        break
       default:
         sendResponse({ error: 'unknown_message' })
     }

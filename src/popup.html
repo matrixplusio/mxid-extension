@@ -24,7 +24,15 @@
   <div id="status" class="muted">…</div>
   <ul id="apps"></ul>
   <div class="row" style="margin-top:10px">
+    <button id="capture">Record login (this tab)</button>
     <a href="#" id="opts" class="muted">Settings</a>
+  </div>
+  <div id="captured" style="display:none;margin-top:10px">
+    <div class="muted">Captured descriptor — paste into the app's protocol config:</div>
+    <textarea id="capjson" readonly style="width:100%;height:110px;font:11px monospace;margin-top:4px"></textarea>
+    <button id="copycap">Copy</button>
+  </div>
+  <div class="row" style="margin-top:8px">
     <span id="base" class="muted"></span>
   </div>
   <script src="popup.js"></script>

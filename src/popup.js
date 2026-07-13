@@ -44,4 +44,32 @@ document.getElementById('opts').addEventListener('click', (e) => {
   chrome.runtime.openOptionsPage()
 })
 
+// --- E4 capture ---
+document.getElementById('capture').addEventListener('click', async () => {
+  await chrome.runtime.sendMessage({ type: 'startCapture' })
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+  if (tab?.id) chrome.tabs.reload(tab.id) // content script re-runs in capture mode
+  window.close()
+})
+
+document.getElementById('copycap').addEventListener('click', () => {
+  const ta = document.getElementById('capjson')
+  ta.select()
+  navigator.clipboard.writeText(ta.value)
+})
+
+async function showCapture() {
+  const { lastCapture } = await chrome.storage.local.get('lastCapture')
+  if (lastCapture) {
+    document.getElementById('captured').style.display = 'block'
+    // merge with a default credential_mode so it drops straight into protocol_config
+    document.getElementById('capjson').value = JSON.stringify(
+      { credential_mode: 'per_user', ...lastCapture },
+      null,
+      2,
+    )
+  }
+}
+
 render()
+showCapture()

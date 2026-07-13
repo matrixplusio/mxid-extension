@@ -3,7 +3,7 @@
   "name": "MXID Form-Fill",
   "version": "0.1.0",
   "description": "Auto-submits login forms for MXID form-fill (SWA) apps using credentials vaulted in MXID.",
-  "permissions": ["storage", "alarms", "notifications"],
+  "permissions": ["storage", "alarms", "notifications", "activeTab", "tabs"],
   "host_permissions": [
     "http://localhost:3500/*",
     "https://*/*"

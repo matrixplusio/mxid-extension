@@ -14,6 +14,14 @@
   if (window.__mxidFormFillRan) return
   window.__mxidFormFillRan = true
 
+  // E4 capture mode: when the user chose "Record login" in the popup, observe the
+  // login instead of auto-filling, and generate a descriptor from what they do.
+  const { capturing } = await chrome.storage.local.get('capturing')
+  if (capturing) {
+    runCapture()
+    return
+  }
+
   let descriptors
   try {
     descriptors = await chrome.runtime.sendMessage({ type: 'getDescriptors' })
@@ -114,6 +122,102 @@ async function doFill(match, cred) {
   }, 3500)
 }
 
+// --- E4 capture ---
+
+// runCapture watches the user perform a real login and records: the field they
+// typed the username into, the password field, the submit control, and the
+// landing URL. It generates a descriptor and hands it to the popup to save.
+function runCapture() {
+  let usernameEl = null
+  let passwordEl = null
+
+  const bar = banner('MXID capture: log in normally — I will record the fields.', 'Cancel', stop)
+
+  const onFocus = (e) => {
+    const el = e.target
+    if (!(el instanceof HTMLInputElement)) return
+    if (el.type === 'password') passwordEl = el
+    else if (['text', 'email', 'tel', ''].includes(el.type)) usernameEl = el
+  }
+  const onInput = (e) => {
+    const el = e.target
+    if (el instanceof HTMLInputElement && el.type !== 'password' && el.value) usernameEl = el
+  }
+  const onClick = (e) => {
+    const btn = e.target.closest && e.target.closest('button, input[type=submit], [type=submit], [role=button]')
+    if (btn && passwordEl && passwordEl.value) {
+      // give the value a tick to settle, then finish
+      setTimeout(() => finish(btn), 50)
+    }
+  }
+  const onSubmit = (e) => {
+    const btn =
+      (e.target instanceof HTMLElement &&
+        e.target.querySelector('button[type=submit], input[type=submit], button')) ||
+      null
+    if (passwordEl) finish(btn)
+  }
+
+  document.addEventListener('focusin', onFocus, true)
+  document.addEventListener('input', onInput, true)
+  document.addEventListener('click', onClick, true)
+  document.addEventListener('submit', onSubmit, true)
+
+  function stop() {
+    document.removeEventListener('focusin', onFocus, true)
+    document.removeEventListener('input', onInput, true)
+    document.removeEventListener('click', onClick, true)
+    document.removeEventListener('submit', onSubmit, true)
+    chrome.storage.local.set({ capturing: false })
+    bar.remove()
+  }
+
+  let finished = false
+  function finish(submitEl) {
+    if (finished || !usernameEl || !passwordEl) return
+    finished = true
+    const descriptor = {
+      login_url: location.origin + location.pathname,
+      username_selector: selectorFor(usernameEl),
+      password_selector: selectorFor(passwordEl),
+      submit_selector: submitEl ? selectorFor(submitEl) : '',
+    }
+    chrome.runtime.sendMessage({ type: 'captureResult', descriptor })
+    stop()
+    banner(
+      'MXID: captured. Open the extension popup to copy the descriptor into the console.',
+      'OK',
+      () => {},
+    )
+  }
+}
+
+// selectorFor builds a stable-ish selector: prefer #id, then [name], then a short
+// path with :nth-of-type. Not bulletproof — capture is a starting point an admin
+// confirms in the console.
+function selectorFor(el) {
+  if (el.id) return '#' + cssEscape(el.id)
+  if (el.getAttribute('name')) return el.tagName.toLowerCase() + '[name="' + el.getAttribute('name') + '"]'
+  const parts = []
+  let node = el
+  while (node && node.nodeType === 1 && parts.length < 4) {
+    let part = node.tagName.toLowerCase()
+    const parent = node.parentElement
+    if (parent) {
+      const sibs = Array.from(parent.children).filter((c) => c.tagName === node.tagName)
+      if (sibs.length > 1) part += ':nth-of-type(' + (sibs.indexOf(node) + 1) + ')'
+    }
+    parts.unshift(part)
+    if (node.id) { parts[0] = '#' + cssEscape(node.id); break }
+    node = parent
+  }
+  return parts.join(' > ')
+}
+
+function cssEscape(s) {
+  return window.CSS && CSS.escape ? CSS.escape(s) : s.replace(/[^a-zA-Z0-9_-]/g, '\\$&')
+}
+
 // --- helpers ---
 
 function sameOrigin(a, b) {
@@ -179,4 +283,5 @@ function banner(text, actionLabel, onAction) {
   close.onclick = () => bar.remove()
   bar.append(btn, close)
   document.documentElement.appendChild(bar)
+  return bar
 }
