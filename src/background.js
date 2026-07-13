@@ -91,6 +91,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         sendResponse(descriptors || [])
         break
       }
+      case 'getBaseUrl':
+        sendResponse({ base: await getBaseUrl() })
+        break
       case 'getCredential':
         sendResponse(await getCredential(msg.appId))
         break
