@@ -14,27 +14,29 @@
   if (window.__mxidFormFillRan) return
   window.__mxidFormFillRan = true
 
-  // Presence marker: on the MXID portal origin ONLY, tag the DOM so the portal can
-  // detect the extension is installed (and skip its "install me" banner). Scoped
-  // to the MXID origin so we don't fingerprint the extension to every site.
-  try {
-    const { base } = await chrome.runtime.sendMessage({ type: 'getBaseUrl' })
-    if (base && new URL(base).origin === location.origin) {
-      const ver = chrome.runtime.getManifest().version
-      document.documentElement.setAttribute('data-mxid-login-ext', ver)
-      window.dispatchEvent(new CustomEvent('mxid-login-ext', { detail: { version: ver } }))
-    }
-  } catch {
-    // SW not ready; the portal poll will retry.
-  }
-
-  // E4 capture mode: when the user chose "Record login" in the popup, observe the
-  // login instead of auto-filling, and generate a descriptor from what they do.
+  // E4 capture mode FIRST — when the user chose "Record login", observe the login
+  // and generate a descriptor. Checked before anything network-ish so capture is
+  // never blocked by a slow service worker.
   const { capturing } = await chrome.storage.local.get('capturing')
   if (capturing) {
     runCapture()
     return
   }
+
+  // Presence marker (best-effort, fire-and-forget): on the MXID portal origin
+  // ONLY, tag the DOM so the portal can detect the extension. Origin-scoped so we
+  // don't fingerprint the extension to every site. Never blocks the fill path.
+  chrome.runtime
+    .sendMessage({ type: 'getBaseUrl' })
+    .then((r) => {
+      const base = r && r.base
+      if (base && new URL(base).origin === location.origin) {
+        const ver = chrome.runtime.getManifest().version
+        document.documentElement.setAttribute('data-mxid-login-ext', ver)
+        window.dispatchEvent(new CustomEvent('mxid-login-ext', { detail: { version: ver } }))
+      }
+    })
+    .catch(() => {})
 
   let descriptors
   try {
