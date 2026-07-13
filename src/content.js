@@ -213,13 +213,23 @@ function runCapture() {
       password_selector: selectorFor(passwordEl),
       submit_selector: submitEl ? selectorFor(submitEl) : '',
     }
-    chrome.runtime.sendMessage({ type: 'captureResult', descriptor })
-    stop()
-    banner(
-      'MXID: captured. Open the extension popup to copy the descriptor into the console.',
-      'OK',
-      () => {},
-    )
+    // Also grab what the user just typed, so recording a login stores the
+    // credential in one shot (if this page matches a known form app).
+    const account = usernameEl.value || ''
+    const credential = passwordEl.value || ''
+    chrome.runtime
+      .sendMessage({ type: 'captureResult', descriptor, account, credential })
+      .then((r) => {
+        stop()
+        banner(
+          r && r.credentialSaved
+            ? 'MXID: login recorded — your credential is saved. It will auto-fill next time.'
+            : 'MXID: captured. Open the extension popup to copy the descriptor into the console.',
+          'OK',
+          () => {},
+        )
+      })
+      .catch(() => stop())
   }
 }
 

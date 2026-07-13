@@ -54,6 +54,31 @@ async function syncDescriptors() {
   return { apps }
 }
 
+function sameOriginUrl(a, b) {
+  try {
+    return new URL(a).origin === new URL(b).origin
+  } catch {
+    return false
+  }
+}
+
+// storeCredential PUTs the user's captured account+password for a form app.
+// Cookie-authed; no step-up (storing your own password isn't high-risk).
+async function storeCredential(appId, account, credential) {
+  const base = await getBaseUrl()
+  try {
+    const r = await fetch(base + `/api/v1/portal/apps/${appId}/credential`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ account, credential }),
+    })
+    return r.ok
+  } catch {
+    return false
+  }
+}
+
 async function getCredential(appId) {
   const base = await getBaseUrl()
   const token = await getToken()
@@ -111,10 +136,23 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         await chrome.storage.local.set({ capturing: true, lastCapture: null })
         sendResponse({ ok: true })
         break
-      case 'captureResult':
+      case 'captureResult': {
         await chrome.storage.local.set({ capturing: false, lastCapture: msg.descriptor })
-        sendResponse({ ok: true })
+        // If this login page matches a form app the user can already launch,
+        // store the credential they just typed — recording = descriptor + creds.
+        let credentialSaved = false
+        if (msg.account && msg.credential && msg.descriptor && msg.descriptor.login_url) {
+          const { descriptors } = await chrome.storage.local.get('descriptors')
+          const app = (descriptors || []).find(
+            (d) => d.login_url && sameOriginUrl(d.login_url, msg.descriptor.login_url),
+          )
+          if (app && app.app_id && app.credential_mode !== 'shared') {
+            credentialSaved = await storeCredential(app.app_id, msg.account, msg.credential)
+          }
+        }
+        sendResponse({ ok: true, credentialSaved })
         break
+      }
       default:
         sendResponse({ error: 'unknown_message' })
     }
