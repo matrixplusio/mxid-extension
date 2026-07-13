@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    body { font: 14px system-ui; max-width: 460px; margin: 40px auto; color: #111; }
+    h1 { font-size: 18px; }
+    label { display: block; margin: 16px 0 6px; font-weight: 600; }
+    input { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font: 14px system-ui; }
+    button { margin-top: 16px; background: #2563eb; color: #fff; border: 0; border-radius: 6px; padding: 8px 16px; cursor: pointer; font: 14px system-ui; }
+    .hint { color: #888; font-size: 12px; margin-top: 6px; }
+    #saved { color: #16a34a; margin-left: 10px; }
+  </style>
+</head>
+<body>
+  <h1>MXID Form-Fill — Settings</h1>
+  <label for="base">MXID base URL</label>
+  <input id="base" type="url" placeholder="https://portal.example.com" />
+  <p class="hint">Where your MXID portal is served. The extension reuses your MXID
+    session cookie, so you must be signed in there. Cross-site cookies require the
+    server's MXID_SESSION_CROSS_SITE_COOKIES=true and HTTPS.</p>
+  <button id="save">Save</button><span id="saved"></span>
+  <script src="options.js"></script>
+</body>
+</html>

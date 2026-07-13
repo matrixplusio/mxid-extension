@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    body { font: 13px system-ui; width: 300px; margin: 0; padding: 12px; color: #111; }
+    h1 { font-size: 14px; margin: 0 0 8px; }
+    .row { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+    button { font: 13px system-ui; border: 1px solid #ddd; background: #f6f6f6; border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+    button.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+    ul { list-style: none; padding: 0; margin: 10px 0 0; max-height: 220px; overflow: auto; }
+    li { display: flex; justify-content: space-between; padding: 6px 0; border-top: 1px solid #eee; }
+    .muted { color: #888; }
+    .ok { color: #16a34a; }
+    .warn { color: #b45309; }
+    #status { margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="row">
+    <h1>MXID Form-Fill</h1>
+    <button id="sync" class="primary">Sync</button>
+  </div>
+  <div id="status" class="muted">…</div>
+  <ul id="apps"></ul>
+  <div class="row" style="margin-top:10px">
+    <a href="#" id="opts" class="muted">Settings</a>
+    <span id="base" class="muted"></span>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
