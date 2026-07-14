@@ -12,7 +12,6 @@
     "tabs"
   ],
   "host_permissions": [
-    "http://localhost:3500/*",
     "https://*/*"
   ],
   "background": {

@@ -3,7 +3,10 @@
 // deployment via the options page. Content scripts are NOT modules and must not
 // import this — they receive everything they need over messaging.
 
-export const DEFAULT_BASE = 'http://localhost:3500'
+// No built-in default: the MXID URL must come from enterprise managed policy or
+// the user's Options page. Empty until configured, so the extension stays inert
+// on a fresh install rather than pointing at some arbitrary host.
+export const DEFAULT_BASE = ''
 
 export const API = {
   // Descriptor sync: which sites are form apps, how to fill them, whether a
@@ -25,7 +28,7 @@ export const TOKEN_HEADER = 'X-MXID-FormFill-Token'
 //   1. enterprise managed policy (chrome.storage.managed) — IT pushes it with the
 //      force-install, so a managed fleet needs zero per-user setup;
 //   2. the user's Options setting;
-//   3. the built-in default.
+//   3. the built-in default (empty — see DEFAULT_BASE).
 export async function getBaseUrl() {
   try {
     const m = await chrome.storage.managed.get('mxidBaseUrl')

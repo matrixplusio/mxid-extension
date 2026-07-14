@@ -6,8 +6,11 @@ const baseEl = document.getElementById('base')
 
 async function render() {
   const { descriptors, syncedAt } = await chrome.storage.local.get(['descriptors', 'syncedAt'])
-  const { mxidBaseUrl } = await chrome.storage.sync.get('mxidBaseUrl')
-  baseEl.textContent = (mxidBaseUrl || 'localhost:3500').replace(/^https?:\/\//, '')
+  // Ask the SW for the resolved base (managed policy → Options → default) so a
+  // managed fleet shows its real URL, not a blank.
+  const r = await chrome.runtime.sendMessage({ type: 'getBaseUrl' }).catch(() => null)
+  const base = (r && r.base) || ''
+  baseEl.textContent = base ? base.replace(/^https?:\/\//, '') : 'not configured — open Options'
   const apps = descriptors || []
   appsEl.innerHTML = ''
   for (const a of apps) {

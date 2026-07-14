@@ -1,8 +1,9 @@
 const input = document.getElementById('base')
 const saved = document.getElementById('saved')
 
+input.placeholder = 'https://mxid.example.com'
 chrome.storage.sync.get('mxidBaseUrl').then(({ mxidBaseUrl }) => {
-  input.value = mxidBaseUrl || 'http://localhost:3500'
+  input.value = mxidBaseUrl || ''
 })
 
 document.getElementById('save').addEventListener('click', async () => {
