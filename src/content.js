@@ -254,13 +254,16 @@ function runCapture() {
 // capture time but NEVER on the next page load (the id is different), so
 // auto-fill silently fails. Treat these as unstable and avoid anchoring on them.
 function looksGeneratedId(id) {
-  return (
-    /^(_r_|mui-|ember|radix-|headlessui|react-aria)/i.test(id) ||
-    /^:?r[0-9a-z]+:?$/i.test(id) || // React 18 useId: ":r0:", "r1a"
-    /_r_?\d/.test(id) ||
-    /^\d+$/.test(id) ||
-    /[0-9a-f]{8,}/i.test(id) // embedded long hex hash
-  )
+  if (/^(_r_|mui-|ember|radix-|headlessui|react-aria|el-id-|rc_select_|ant-)/i.test(id)) return true
+  if (/^:?r[0-9a-z]+:?$/i.test(id)) return true // React 18 useId: ":r0:", "r1a"
+  if (/_r_?\d/.test(id)) return true
+  if (/^\d+$/.test(id)) return true
+  if (/[0-9a-f]{8,}/i.test(id)) return true // embedded long hex hash
+  // Any segment mixing letters AND digits and ≥4 chars reads as a random token
+  // (`el-id-4etmaf`, `input8236a`), unlike semantic ids whose segments are words
+  // (`login_username`, `user_login`, `kc-login`). Splitting on -/_/:/. keeps the
+  // semantic-word case safe (`field1` is 6 chars? no — single short segment).
+  return id.split(/[-_:.]/).some((s) => s.length >= 4 && /[a-z]/i.test(s) && /\d/.test(s))
 }
 
 // stableId returns the element's id only when it looks durable (not framework-
