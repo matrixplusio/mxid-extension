@@ -49,7 +49,35 @@
   const match = descriptors.find(
     (d) => d.login_url && sameOrigin(d.login_url, location.href),
   )
-  if (!match || !match.username_selector) return
+  if (!match) return
+  // Matched a form app on this origin but it has no recorded fields: the fill gate
+  // has nothing to match, so it would silently do nothing. Surface it instead —
+  // an admin recording a login here (extension popup → Record) will configure it.
+  if (!match.username_selector) {
+    banner(
+      'MXID: this app is not fully configured yet (no login fields recorded). ' +
+        'Open the MXID extension and click Record on this app to set it up.',
+      'Dismiss',
+      () => {},
+    )
+    return
+  }
+
+  // Don't fight a sign-out. If this page looks like a logout landing (URL says so),
+  // an auto-fill+submit would immediately log the user back in — an inescapable
+  // loop. Pause and offer a one-click fill instead so re-login stays intentional.
+  if (looksLikeLogout()) {
+    offerManualFill(match, 'MXID: you just signed out — auto-fill is paused. Click to sign in again.')
+    return
+  }
+
+  // Cooldown: if we auto-submitted this origin very recently and the login page is
+  // back, it's either a failed login or an immediate sign-out. Either way, don't
+  // auto-resubmit into a loop — offer a manual fill.
+  if (await recentlyAutoSubmitted()) {
+    offerManualFill(match, 'MXID: auto-fill paused (just submitted here). Click to sign in.')
+    return
+  }
 
   // The username field must exist (waited for) before we do anything.
   const userEl = await waitFor(match.username_selector, 8000)
@@ -57,6 +85,49 @@
 
   await attempt(match, false)
 })()
+
+// --- logout / loop guards ---
+
+// AUTO_SUBMIT_COOLDOWN_MS: after an auto-submit, ignore the same origin for this
+// long so a reappearing login page (failed login or immediate logout) can't loop.
+const AUTO_SUBMIT_COOLDOWN_MS = 30000
+
+// looksLikeLogout flags a post-sign-out landing from the URL (path/query/hash).
+// Covers the common spellings (/logout, #/logout, ?loggedout, sign-out, …).
+function looksLikeLogout() {
+  const u = (location.pathname + location.search + location.hash).toLowerCase()
+  return /log[-_]?out|sign[-_]?out|logged[-_]?out|signed[-_]?out/.test(u)
+}
+
+// recentlyAutoSubmitted reports whether we auto-submitted THIS origin within the
+// cooldown. Timestamps live in chrome.storage.local, keyed by origin.
+async function recentlyAutoSubmitted() {
+  try {
+    const { autoSubmitAt } = await chrome.storage.local.get('autoSubmitAt')
+    const at = autoSubmitAt && autoSubmitAt[location.origin]
+    return !!at && Date.now() - at < AUTO_SUBMIT_COOLDOWN_MS
+  } catch {
+    return false
+  }
+}
+
+// markAutoSubmitted stamps the cooldown for this origin right after we submit.
+async function markAutoSubmitted() {
+  try {
+    const { autoSubmitAt } = await chrome.storage.local.get('autoSubmitAt')
+    const map = autoSubmitAt || {}
+    map[location.origin] = Date.now()
+    await chrome.storage.local.set({ autoSubmitAt: map })
+  } catch {
+    /* best-effort */
+  }
+}
+
+// offerManualFill shows a banner whose action fills + submits on demand, bypassing
+// the auto-fill guards (the user explicitly asked to sign in).
+function offerManualFill(match, text) {
+  banner(text, 'Sign in', () => attempt(match, false))
+}
 
 // attempt: fetch a credential and fill, or (when not polling) offer the step-up /
 // sign-in action and start polling for the moment it becomes available.
@@ -138,6 +209,9 @@ async function doFill(match, cred) {
 
   const submit = match.submit_selector && document.querySelector(match.submit_selector)
   if (!submit) return
+  // Stamp the cooldown BEFORE submitting: the click can navigate away and tear
+  // this context down, so record first (the write survives the unload).
+  await markAutoSubmitted()
   submit.click()
 
   // A successful login navigates away and tears down this context. If we're still

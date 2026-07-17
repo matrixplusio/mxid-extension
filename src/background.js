@@ -66,11 +66,17 @@ function sameOriginUrl(a, b) {
 // Cookie-authed; no step-up (storing your own password isn't high-risk).
 async function storeCredential(appId, account, credential) {
   const base = await getBaseUrl()
+  const token = await getToken()
   try {
     const r = await fetch(base + `/api/v1/portal/apps/${appId}/credential`, {
       method: 'PUT',
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      // The binding token doubles as the CSRF bypass (custom header the server
+      // trusts in place of a same-site Origin the extension can't provide).
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { [TOKEN_HEADER]: token } : {}),
+      },
       body: JSON.stringify({ account, credential }),
     })
     return r.ok
@@ -79,36 +85,94 @@ async function storeCredential(appId, account, credential) {
   }
 }
 
+// saveDescriptor PUTs the captured login_url + selectors for a form app, so
+// "record a login" configures the app in one step instead of an admin copying
+// selectors into the console by hand. Server-gated: admin + fresh step-up +
+// ext-token. A non-admin (or unpaired) caller is refused — harmless, they still
+// store their own credential. Returns a status the caller can log; never throws.
+async function saveDescriptor(appId, descriptor) {
+  const base = await getBaseUrl()
+  const token = await getToken()
+  try {
+    const r = await fetch(base + API.descriptor(appId), {
+      method: 'PUT',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { [TOKEN_HEADER]: token } : {}),
+      },
+      body: JSON.stringify({
+        login_url: descriptor.login_url,
+        username_selector: descriptor.username_selector,
+        password_selector: descriptor.password_selector,
+        submit_selector: descriptor.submit_selector || '',
+      }),
+    })
+    if (r.ok) return { ok: true }
+    const body = await r.json().catch(() => ({}))
+    return { ok: false, status: r.status, code: body.code }
+  } catch (e) {
+    return { ok: false, error: String(e) }
+  }
+}
+
 // flushPendingCapture stores the credential the content script stashed at login
 // time. It runs from multiple triggers (captureResult message, storage.onChanged,
 // SW wake, sync alarm) so a torn-down message after a fast post-login 301 never
 // loses the credential. Idempotent: storeCredential is a PUT, so re-running is safe.
 async function flushPendingCapture() {
-  const { pendingCapture, descriptors } = await chrome.storage.local.get([
+  const { pendingCapture, descriptors, captureTargetAppId } = await chrome.storage.local.get([
     'pendingCapture',
     'descriptors',
+    'captureTargetAppId',
   ])
   if (!pendingCapture) return { credentialSaved: false }
   const { descriptor, account, credential } = pendingCapture
-  let credentialSaved = false
-  if (account && credential && descriptor && descriptor.login_url) {
-    const app = (descriptors || []).find(
+
+  // Resolve WHICH app this capture configures. An explicit target (the admin
+  // clicked "Record" on a specific app in the popup) is authoritative and, crucially,
+  // works even when the app has no login_url yet — that's the chicken-and-egg the
+  // descriptor push breaks: you can't origin-match an app that has never been
+  // configured. Fall back to origin-matching an already-configured app (a
+  // rank-and-file user re-recording their credential for a working app).
+  let app = null
+  if (captureTargetAppId) {
+    app = (descriptors || []).find((d) => String(d.app_id) === String(captureTargetAppId)) || {
+      app_id: captureTargetAppId,
+      credential_mode: 'per_user',
+    }
+  } else if (descriptor && descriptor.login_url) {
+    app = (descriptors || []).find(
       (d) => d.login_url && sameOriginUrl(d.login_url, descriptor.login_url),
     )
-    if (app && app.app_id && app.credential_mode !== 'shared') {
-      credentialSaved = await storeCredential(app.app_id, account, credential)
-    } else {
-      // No matching per_user form app to store into — nothing to retry, drop it.
-      await chrome.storage.local.remove('pendingCapture')
-      return { credentialSaved: false }
-    }
   }
+
+  // Push the captured descriptor (login_url + selectors) so recording configures
+  // the app in one step. Admin + step-up gated server-side; a non-admin's PUT is
+  // refused (403) — harmless, they still store their credential below. Only
+  // attempted when we have a resolved app + a descriptor with selectors.
+  let descriptorSaved = false
+  if (app && app.app_id && descriptor && descriptor.username_selector && descriptor.login_url) {
+    const r = await saveDescriptor(app.app_id, descriptor)
+    descriptorSaved = !!r.ok
+    if (descriptorSaved) await syncDescriptors() // app now has selectors → fill works next load
+  }
+
+  let credentialSaved = false
+  if (account && credential && app && app.app_id && app.credential_mode !== 'shared') {
+    credentialSaved = await storeCredential(app.app_id, account, credential)
+  } else if (account && credential && !app) {
+    // No app to store into — nothing to retry, drop the pending capture.
+    await chrome.storage.local.remove(['pendingCapture', 'captureTargetAppId'])
+    return { credentialSaved: false, descriptorSaved }
+  }
+
   // Clear only on success (or when there was nothing to store) so a transient
   // network failure keeps the pending creds for a later trigger to retry.
   if (credentialSaved || !(account && credential)) {
-    await chrome.storage.local.remove('pendingCapture')
+    await chrome.storage.local.remove(['pendingCapture', 'captureTargetAppId'])
   }
-  return { credentialSaved }
+  return { credentialSaved, descriptorSaved }
 }
 
 async function getCredential(appId) {
@@ -175,7 +239,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         // handlers below flush the same pendingCapture instead.
         await chrome.storage.local.set({ capturing: false, lastCapture: msg.descriptor })
         const res = await flushPendingCapture()
-        sendResponse({ ok: true, credentialSaved: res.credentialSaved })
+        sendResponse({ ok: true, credentialSaved: res.credentialSaved, descriptorSaved: res.descriptorSaved })
         break
       }
       default:

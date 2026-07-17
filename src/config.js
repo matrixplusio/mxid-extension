@@ -14,6 +14,10 @@ export const API = {
   list: '/api/v1/portal/formfill/apps',
   // Reveal a single credential (the only plaintext endpoint; step-up gated).
   reveal: (appId) => `/api/v1/portal/apps/${appId}/credential`,
+  // Write a form app's captured descriptor (login_url + selectors) so recording a
+  // login configures the app in one step. Admin + step-up gated server-side; a
+  // non-admin's PUT is refused (they only store their own credential).
+  descriptor: (appId) => `/api/v1/portal/apps/${appId}/descriptor`,
   // Pair this extension install (step-up gated) → a binding token that reveal
   // requires in addition to the cookie, so another extension can't ride it.
   pair: '/api/v1/portal/formfill/pair',
